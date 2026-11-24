@@ -187,22 +187,48 @@ int gx51_open_irq_gpio48(void)
 {
     struct gpio_v2_line_request req = {0};
     int chip = gx51_open_int34bb();
+    /* MateBook 13 uses GPIO48 for the sensor IRQ. On MateBook D14/D15
+     * (Intel WAX9 platform) that line is wired to the speaker amplifier
+     * ("speakers-enable"); the fingerprint IRQ lives on GPIO279 instead.
+     * Probe the reference line first, then the WAX9 line; GXFP_IRQ_LINE
+     * overrides the probe order with a single explicit line number. */
+    unsigned int candidates[2];
+    unsigned int n_candidates = 0;
+    const char *override;
 
     if (chip < 0)
         return -1;
 
-    req.num_lines = 1;
-    req.offsets[0] = GX51_EXPECTED_HWIRQ;
-    req.config.flags = GPIO_V2_LINE_FLAG_INPUT;
-    strncpy(req.consumer, "goodix51a0-irq", sizeof(req.consumer) - 1);
+    override = getenv ("GXFP_IRQ_LINE");
+    if (override && *override)
+      {
+        char *end = NULL;
+        unsigned long v = strtoul (override, &end, 10);
+        if (end && *end == '\0' && v < 512)
+          candidates[n_candidates++] = (unsigned int) v;
+      }
+    if (n_candidates == 0)
+      {
+        candidates[n_candidates++] = GX51_EXPECTED_HWIRQ;
+        candidates[n_candidates++] = 279u;
+      }
 
-    if (ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &req) < 0 || req.fd < 0) {
-        close(chip);
-        return -1;
-    }
+    for (unsigned int i = 0; i < n_candidates; i++)
+      {
+        memset (&req, 0, sizeof req);
+        req.num_lines = 1;
+        req.offsets[0] = candidates[i];
+        req.config.flags = GPIO_V2_LINE_FLAG_INPUT;
+        strncpy(req.consumer, "goodix51a0-irq", sizeof(req.consumer) - 1);
+
+        if (ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &req) == 0 && req.fd >= 0) {
+            close(chip);
+            return req.fd;
+        }
+      }
 
     close(chip);
-    return req.fd;
+    return -1;
 }
 
 static int

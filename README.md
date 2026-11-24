@@ -1,3 +1,10 @@
+> **MateBook D14/D15 (Intel WAX9) fork.** This fork adds support for the
+> MateBook D14/D15 Intel models (e.g. NBLB-WAX9N): the fingerprint IRQ is
+> probed with a GPIO48 → GPIO279 fallback (see `GXFP_IRQ_LINE`), and
+> `contrib/60-wax9-goodix51a0.conf` relaxes the FDT-down proof that misfires
+> on this board. Start here: **[README-MATEBOOK-D.md](README-MATEBOOK-D.md)**.
+> Everything below is the upstream MateBook 13 documentation.
+
 **Safety update — 19 November 2026.** After a deep-S3 lockout affecting both fingerprint and password, the optional KDE QML v12 is quarantined and Pegasus runs stock Plasma 6.8.3 QML. The greeter remembers `Regular` (password) to avoid KDE crash #528285. `Fingerprint=false` hides the selectable fingerprint method while the parallel fingerprint worker can still run. The operator confirmed one password unlock after a kernel-confirmed deep-S3 resume. Repeatability remains unverified. [Incident report](fingerprint/docs/real-hardware-certification.md).
 
 **Reliability changes — 19 November 2026.** QA63.2 protects calibration when the sensor is partly touched and waits for a confirmed lift before continuing a scored attempt. A separate [native KDE 6.8.3 candidate](fingerprint/integration/kscreenlocker-upstream-s3/README.md#plasma-683-native-readiness-candidate) retains early authentication requests and can restart the implicit fingerprint conversation after a timeout. The driver installer does not replace KDE. Fresh physical LOCK/S3 checks remain required; historical QA63 results do not certify this revision.

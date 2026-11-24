@@ -1,5 +1,18 @@
 # Maintainer instructions — Huawei MateBook 13 Linux
 
+## Fork divergence (MateBook D14/D15 WAX9)
+
+This fork carries two board-specific changes on top of upstream; keep them
+when merging upstream work:
+
+1. `fingerprint/driver/goodix51a0/gx51_transport.c` (`gx51_open_irq_gpio48`):
+   probes the IRQ line as GPIO48 first, falls back to GPIO279, with
+   `GXFP_IRQ_LINE` env override. On WAX9 boards GPIO48 is `speakers-enable`.
+   `SOURCE_MANIFEST.sha256` is updated accordingly.
+2. `contrib/60-wax9-goodix51a0.conf`: systemd drop-in setting
+   `GXFP_FDT_DOWN_PROOF_QA=0` for WAX9 (single FDT-down reply). Documented in
+   `README-MATEBOOK-D.md`.
+
 Before changing, building or installing any GXFP51A0 candidate, **read**
 `fingerprint/docs/HALL_OF_FAME.md`, `fingerprint/docs/HARDWARE_TRIALS.csv`,
 and the private canonical Cloud9 workspace handoff (not tracked by Git).
