@@ -1,6 +1,6 @@
 pkgname=libfprint-goodix51a0
 pkgver=1.94.100.goodix51a0.qa63
-pkgrel=3
+pkgrel=4
 pkgdesc="libfprint 1.94.100 with native Goodix GXFP51A0 SPI driver"
 arch=('x86_64')
 url="https://fprint.freedesktop.org/"
@@ -17,6 +17,12 @@ _fp_root="$(cd "$startdir/../.." && pwd)"
 
 build() {
   local build_root="$srcdir/gxfp51a0-public-build"
+
+  # WAX9 (MateBook D14/D15): the sensor sometimes needs >1 s to answer
+  # GET_IMAGE; the reference 1000 ms window expires before the ACK/TLS record
+  # arrives and the retry then finds the finger already lifted. Widen only
+  # the capture-reply window, keep everything else stock.
+  export CFLAGS="${CFLAGS:+$CFLAGS }-DGX_GET_IMAGE_ACK_TIMEOUT_MS=3000 -DGX_TARGET_ACK_IRQ_TIMEOUT_MS=300"
 
   GXFP51A0_BUILD_ROOT="$build_root" \
   GXFP51A0_MESON_PREFIX=/usr \
