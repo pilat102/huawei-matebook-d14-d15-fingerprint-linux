@@ -64,6 +64,24 @@ slightly moving the finger each time), or use the guided wizard
 Other distros: see `fingerprint/README.md` (the portable `./fingerprint/install.sh`
 path) — but note the IRQ fallback and the drop-in above apply there too.
 
+## Tips for daily use (small 80x64 mm sensor)
+
+- **Enroll the same physical finger under two names** (e.g. right-index and
+  right-middle). Identify compares a scan against all enrolled templates, so
+  40 reference views noticeably improve first-press acceptance compared to 20.
+- Hold the finger still for ~2-3 s per touch. A failed press costs a
+  ~1 s background re-calibration before the next attempt, so repeated quick
+  taps feel much slower than one steady press.
+- Expect **~2-3 s from touch to unlock** on a warm session (capture alone is
+  ~0.6 s; this matches the upstream reference machine's measured
+  finger-to-positive time). The first touch after boot or resume can take
+  longer while the driver re-establishes the TLS session and background.
+- Plasma's lock screen shows only a small fingerprint icon near the password
+  field — there is no Windows/Android-style progress animation in stock KDE,
+  and upstream's experimental QML integration is quarantined after a lockout
+  incident. The driver logs every stage in
+  `journalctl -b -u fprintd` if you want to see what it is doing.
+
 ## How the IRQ line was found (for other boards)
 
 - `lsusb` shows nothing — the sensor hangs off **SPI** (`spi-GXFP51A0:00`,
