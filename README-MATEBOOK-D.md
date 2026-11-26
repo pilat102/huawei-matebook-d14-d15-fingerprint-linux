@@ -64,6 +64,35 @@ slightly moving the finger each time), or use the guided wizard
 Other distros: see `fingerprint/README.md` (the portable `./fingerprint/install.sh`
 path) — but note the IRQ fallback and the drop-in above apply there too.
 
+## Fedora / RHEL (SELinux)
+
+The portable installer works on Fedora (`./fingerprint/install.sh`, tested on
+Fedora 45). Two extra steps are required:
+
+```bash
+# 1. Wider GET_IMAGE reply window (same as the Arch package build)
+export CFLAGS="-DGX_GET_IMAGE_ACK_TIMEOUT_MS=3000 -DGX_TARGET_ACK_IRQ_TIMEOUT_MS=300"
+./fingerprint/install.sh
+
+# 2. WAX9 drop-in must sort AFTER the installer's 60-goodix51a0-local.conf
+sudo tee /etc/systemd/system/fprintd.service.d/61-wax9-goodix51a0.conf <<'EOF'
+[Service]
+Environment=GXFP_FDT_DOWN_PROOF_QA=0
+EOF
+sudo systemctl daemon-reload
+
+# 3. SELinux: allow fprintd_t to reach gpiochip0 + spidev0.0
+cd contrib/selinux
+checkmodule -M -m -o gxfp51a0-fprintd.mod gxfp51a0-fprintd.te
+semodule_package -o gxfp51a0-fprintd.pp -m gxfp51a0-fprintd.mod
+sudo semodule -i gxfp51a0-fprintd.pp
+sudo systemctl restart fprintd
+```
+
+Without step 3 the driver fails with `reviewed GPIO264 reset failed` /
+`GPIO48 IRQ input is not available` and audit logs
+`avc: denied { read write } ... fprintd_t ... gpio_device_t`.
+
 ## Tips for daily use (small 80x64 mm sensor)
 
 - **Enroll the same physical finger under two names** (e.g. right-index and

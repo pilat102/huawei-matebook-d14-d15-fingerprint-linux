@@ -1,0 +1,31 @@
+# SELinux policy module for the GXFP51A0 driver (Fedora/RHEL)
+#
+# Fedora runs fprintd in the dedicated fprintd_t domain, which is denied
+# access to:
+#   /dev/gpiochip0  (gpio_device_t) - the SPI reset (GPIO264) and IRQ (GPIO279)
+#   /dev/spidev0.0  (usb_device_t)  - the sensor SPI transport
+# Without this module the driver fails with
+#   "Open failed with error: GXFP51A0 GPIO48 IRQ input is not available"
+# or "reviewed GPIO264 reset failed", and audit shows:
+#   avc: denied { read write } ... fprintd_t ... gpio_device_t ... chr_file
+#
+# Build and install:
+#   checkmodule -M -m -o gxfp51a0-fprintd.mod gxfp51a0-fprintd.te
+#   semodule_package -o gxfp51a0-fprintd.pp -m gxfp51a0-fprintd.mod
+#   sudo semodule -i gxfp51a0-fprintd.pp
+#   sudo systemctl restart fprintd
+#
+# Verify: sudo ausearch -m avc -ts recent should show no new denials after
+# a fingerprint attempt.
+
+module gxfp51a0-fprintd 1.0;
+
+require {
+    type fprintd_t;
+    type gpio_device_t;
+    type usb_device_t;
+    class chr_file { open read write ioctl getattr setattr lock };
+}
+
+allow fprintd_t gpio_device_t:chr_file { open read write ioctl getattr setattr lock };
+allow fprintd_t usb_device_t:chr_file { open read write ioctl getattr setattr lock };

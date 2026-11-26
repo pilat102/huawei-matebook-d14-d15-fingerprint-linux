@@ -11,7 +11,17 @@ when merging upstream work:
    `SOURCE_MANIFEST.sha256` is updated accordingly.
 2. `contrib/60-wax9-goodix51a0.conf`: systemd drop-in setting
    `GXFP_FDT_DOWN_PROOF_QA=0` for WAX9 (single FDT-down reply). Documented in
-   `README-MATEBOOK-D.md`.
+   `README-MATEBOOK-D.md`. On the portable (non-Arch) installer the drop-in
+   file is named `61-wax9-goodix51a0.conf` so it sorts after the installer's
+   `60-goodix51a0-local.conf`.
+3. `contrib/selinux/gxfp51a0-fprintd.te`: local SELinux module for Fedora/RHEL.
+   fprintd_t is denied access to `/dev/gpiochip0` (gpio_device_t) and
+   `/dev/spidev0.0` (usb_device_t) by default, so the driver fails with
+   "GPIO48 IRQ input is not available" / "reviewed GPIO264 reset failed".
+   The Arch PKGBUILD additionally passes
+   `-DGX_GET_IMAGE_ACK_TIMEOUT_MS=3000 -DGX_TARGET_ACK_IRQ_TIMEOUT_MS=300`
+   via CFLAGS (WAX9 GET_IMAGE reply can exceed 1 s); on the portable path
+   export the same CFLAGS before `fingerprint/install.sh`.
 
 Before changing, building or installing any GXFP51A0 candidate, **read**
 `fingerprint/docs/HALL_OF_FAME.md`, `fingerprint/docs/HARDWARE_TRIALS.csv`,
