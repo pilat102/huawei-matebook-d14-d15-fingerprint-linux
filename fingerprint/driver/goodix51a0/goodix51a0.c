@@ -3698,7 +3698,7 @@ gx_cold_contact_gate_ready (gboolean contact, guint zones,
   return (zones >= 5 && elapsed_us >= GX_COLD_CONTACT_READY_US) ||
          (zones >= 3 && elapsed_us >= GX_COLD_PARTIAL_GRACE_US);
 }
-#define GX_SAME_PRESS_CAPTURE_ATTEMPTS 3 /* initial image + up to 2 quality-only recaptures */
+#define GX_SAME_PRESS_CAPTURE_ATTEMPTS 3 /* initial image + up to 2 recaptures of the same held pose */
 
 /* ------------------------------------------------------------------ */
 /*  Off-loading the blocking work                                      */
@@ -4609,12 +4609,29 @@ gx_capture_auth_same_press (FpiDeviceGoodix51A0 *self,
       best_adapt = adapt_views;
 
       /*
-       * Security boundary: the first usable image is the only scored draw for
-       * this physical press.  A score below threshold requests a complete new
-       * pose through the existing outer verify/identify retry budget.  Never
-       * turn the fixed threshold into a best-of-N score-conditioned retry.
+       * Security boundary (upstream): the first usable image is the only
+       * scored draw for this physical press. A score below threshold
+       * requests a complete new pose through the existing outer
+       * verify/identify retry budget. Never turn the fixed threshold into
+       * a best-of-N score-conditioned retry.
+       *
+       * WAX9 opt-in (GXFP_WAX9_BEST_OF_PRESS_QA=1): on the MateBook D14/D15
+       * the genuine-finger per-image score distribution sits lower (5-8
+       * typical, 12-15 good touches) so a single draw passes the fixed
+       * threshold only ~half the time, making the first press a lottery.
+       * Take up to GX_SAME_PRESS_CAPTURE_ATTEMPTS biometric images of the
+       * SAME held pose and keep the best. The acceptance line stays at
+       * GX_MATCH_THRESHOLD; what changes is only how many independent
+       * frames of one pose get a draw. Impostor frames score far below
+       * the threshold (observed 0-6 against a line of 7), so the per-press
+       * false-accept grows roughly linearly with the draw count rather
+       * than by lowering the line itself. Success breaks immediately, so
+       * a good first image costs no extra time.
        */
-      break;
+      if (g_strcmp0 (g_getenv ("GXFP_WAX9_BEST_OF_PRESS_QA"), "1") != 0)
+        break;
+      if (best_score >= GX_MATCH_THRESHOLD)
+        break;
     }
 
   if (cleanup_needed && !self->capture_recovery_pending)
