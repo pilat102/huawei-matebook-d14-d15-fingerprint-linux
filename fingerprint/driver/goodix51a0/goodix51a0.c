@@ -3269,10 +3269,32 @@ gx_preprocess (FpiDeviceGoodix51A0 *self, const guint16 *px)
    * one physical frame per press.  The matcher wrapper performs the final
    * percentile stretch and unsharp mask. */
   for (int i = 0; i < n; i++)
+    out[i] = (double) px[i] - self->bg_frame[i];
+
+  /* WAX9 (MateBook D14/D15): this board's readout leaves strong vertical
+   * column banding in the residual — measured at 40-50% of the residual
+   * standard deviation even seconds after a background refresh. The banding
+   * realization differs per capture, so it decorrelates the BRIEF
+   * descriptor comparisons between two captures of the same finger and
+   * drives match scores into the floor. Remove the per-column median of
+   * the residual before recentering; the median is robust to the finger
+   * blob, which covers well under half of each column. */
+  for (int x = 0; x < GOODIX_IMG_WIDTH; x++)
     {
-      out[i] = (double) px[i] - self->bg_frame[i];
-      sorted[i] = out[i];
+      double col[GOODIX_IMG_HEIGHT];
+
+      for (int y = 0; y < GOODIX_IMG_HEIGHT; y++)
+        col[y] = out[y * GOODIX_IMG_WIDTH + x];
+      qsort (col, GOODIX_IMG_HEIGHT, sizeof *col, gx_cmp_dbl);
+
+      const double med = col[GOODIX_IMG_HEIGHT / 2];
+
+      for (int y = 0; y < GOODIX_IMG_HEIGHT; y++)
+        out[y * GOODIX_IMG_WIDTH + x] -= med;
     }
+
+  for (int i = 0; i < n; i++)
+    sorted[i] = out[i];
 
   qsort (sorted, n, sizeof *sorted, gx_cmp_dbl);
   pos = 0.54 * (double) (n - 1);
