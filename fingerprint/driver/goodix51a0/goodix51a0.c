@@ -2072,16 +2072,67 @@ gx_read_fw_version (FpiDeviceGoodix51A0 *self, gchar *out, gsize cap)
 #define GX_TIMING_SCALE_MAX 300
 #define GX_TIMING_SCALE_STEP 50
 
+
+
 #define GX_CAPTURE_SCALE_MIN 100
 #define GX_CAPTURE_SCALE_MAX 300
 #define GX_CAPTURE_SCALE_STEP 50
 #define GX_CAPTURE_CLEAN_DECAY_STREAK 8
 
+/* WAX9 (MateBook D14/D15): persist the learned protocol/capture pacing
+ * across daemon restarts. Fresh sessions start at 100% and the first
+ * captures come out corrupted (sift ~1 ms, score 0) until the ratchet
+ * climbs through several failed attempts (observed 150->200->250). The
+ * scales are controller characteristics, not biometric data: bounded
+ * integer percentages, clamped on load, written root-only next to the
+ * existing PMK cache. */
+#define GX_PACING_STATE_FILE "/var/lib/fprint/.goodix51a0-pacing"
+
+static void
+gx_pacing_state_load (FpiDeviceGoodix51A0 *self)
+{
+  gchar *contents = NULL;
+  int timing = 0, capture = 0;
+
+  if (!g_file_get_contents (GX_PACING_STATE_FILE, &contents, NULL, NULL))
+    return;
+
+  if (sscanf (contents, "%d %d", &timing, &capture) == 2)
+    {
+      self->timing_scale = CLAMP (timing, GX_TIMING_SCALE_MIN, GX_TIMING_SCALE_MAX);
+      self->capture_gap_scale = CLAMP (capture, GX_CAPTURE_SCALE_MIN, GX_CAPTURE_SCALE_MAX);
+      fp_warn ("GXFP51A0 WAX9 pacing restored from %s: timing=%d%% capture=%d%%",
+               GX_PACING_STATE_FILE, self->timing_scale, self->capture_gap_scale);
+    }
+
+  g_free (contents);
+}
+
+static void
+gx_pacing_state_save (FpiDeviceGoodix51A0 *self)
+{
+  gchar *contents = g_strdup_printf ("%d %d",
+                                     CLAMP (self->timing_scale, GX_TIMING_SCALE_MIN, GX_TIMING_SCALE_MAX),
+                                     CLAMP (self->capture_gap_scale, GX_CAPTURE_SCALE_MIN, GX_CAPTURE_SCALE_MAX));
+  GError *error = NULL;
+
+  if (!g_file_set_contents_full (GX_PACING_STATE_FILE, contents, -1,
+                                 G_FILE_SET_CONTENTS_NONE, 0600, &error))
+    {
+      fp_warn ("GXFP51A0 WAX9 pacing state not persisted: %s", error->message);
+      g_error_free (error);
+    }
+
+  g_free (contents);
+}
+
+
 /* Protocol timing is a controller/session characteristic, not biometric
- * evidence. Start every fresh fprintd process at Windows-nominal 100%, then
- * widen only after an observed missed ACK/FDT response. Keep the result in RAM
- * for the daemon lifetime so a recovery does not relearn the same controller.
- * Nothing is persisted across daemon restarts or boots. */
+ * evidence. Start at Windows-nominal 100% (or at the persisted WAX9 value,
+ * see gx_pacing_state_load), then widen only after an observed missed
+ * ACK/FDT response. Keep the result in RAM for the daemon lifetime so a
+ * recovery does not relearn the same controller; the WAX9 fork persists
+ * the scale across restarts to avoid corrupted first captures. */
 static void
 gx_protocol_timing_miss (FpiDeviceGoodix51A0 *self,
                          const gchar          *source)
@@ -2097,6 +2148,8 @@ gx_protocol_timing_miss (FpiDeviceGoodix51A0 *self,
   fp_warn ("GXFP51A0 protocol timing auto-calibration: %d%% -> %d%% "
            "after %s miss; session-local only",
            previous, self->timing_scale, source ? source : "protocol");
+
+  gx_pacing_state_save (self);
 }
 
 static guint
@@ -2132,6 +2185,8 @@ gx_capture_transport_desync (FpiDeviceGoodix51A0 *self)
   fp_warn ("GXFP51A0 session capture desync: pacing %d%% -> %d%% "
            "(%u us gap); full MCU/session recovery required; not persisted",
            previous, self->capture_gap_scale, gx_capture_gap_us (self));
+
+  gx_pacing_state_save (self);
 }
 
 /* QA57: protocol ACK misses do not establish an image capture timing fault.
@@ -6115,6 +6170,8 @@ fpi_device_goodix51a0_init (FpiDeviceGoodix51A0 *self)
   self->warm_sleep_delta_us = 0;
   self->warm_sleep_clock_valid = FALSE;
   self->force_cold_reset = FALSE;
+
+  gx_pacing_state_load (self);
 }
 
 
