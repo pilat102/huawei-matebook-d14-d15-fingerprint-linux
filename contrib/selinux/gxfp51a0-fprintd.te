@@ -9,6 +9,10 @@
 # or "reviewed GPIO264 reset failed", and audit shows:
 #   avc: denied { read write } ... fprintd_t ... gpio_device_t ... chr_file
 #
+# The var_run_t rules are only needed for diagnostic (GXFP51A0_DEVELOPER)
+# builds that dump raw captures to /run/goodix51a0/dump for offline image
+# quality analysis. They are harmless for release builds.
+#
 # Build and install:
 #   checkmodule -M -m -o gxfp51a0-fprintd.mod gxfp51a0-fprintd.te
 #   semodule_package -o gxfp51a0-fprintd.pp -m gxfp51a0-fprintd.mod
@@ -24,8 +28,15 @@ require {
     type fprintd_t;
     type gpio_device_t;
     type usb_device_t;
+    type var_run_t;
     class chr_file { open read write ioctl getattr setattr lock };
+    class dir { write add_name remove_name };
+    class file { create open read write getattr setattr rename };
 }
 
 allow fprintd_t gpio_device_t:chr_file { open read write ioctl getattr setattr lock };
 allow fprintd_t usb_device_t:chr_file { open read write ioctl getattr setattr lock };
+
+# developer-build capture dumps under /run/goodix51a0/dump (var_run_t)
+allow fprintd_t var_run_t:dir { write add_name remove_name };
+allow fprintd_t var_run_t:file { create open read write getattr setattr rename };
