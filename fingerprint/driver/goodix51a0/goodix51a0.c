@@ -1918,8 +1918,16 @@ gx_fdt_drop (const int *base, const int *cur)
  * Authentication threshold remains independent at 7; these much lower scores
  * are used only while the user is deliberately enrolling the same finger. */
 #define GX_ENROLL_ANCHOR_STAGES              5
-#define GX_ENROLL_ANCHOR_MIN_SCORE           3
-#define GX_ENROLL_EXTENSION_MIN_SCORE        3
+/* WAX9 (MateBook D14/D15): with this board's noisier captures, consecutive
+ * varied placements routinely score 0-2 on the SIFT link test against the
+ * anchor (reference MateBook 13 links them at 5+). Requiring 3 makes the
+ * wizard reject nearly every moved finger and forces an all-same-spot anchor,
+ * which produces a low-diversity template (25-41 keypoints/view) that then
+ * verifies at the edge of the auth threshold. Relaxing only the enrollment
+ * connectivity to 2 lets varied placements enroll; authentication threshold
+ * stays at 7. */
+#define GX_ENROLL_ANCHOR_MIN_SCORE           2
+#define GX_ENROLL_EXTENSION_MIN_SCORE        2
 #define GX_ENROLL_EXTENSION_WEAK_SCORE       2
 #define GX_ENROLL_EXTENSION_WEAK_LINKS       2
 
