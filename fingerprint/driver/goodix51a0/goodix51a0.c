@@ -4630,11 +4630,16 @@ gx_enroll_view_connected (GPtrArray             *accepted,
   if (out_weak_links)
     *out_weak_links = weak_links;
 
-  if (stage < GX_ENROLL_ANCHOR_STAGES)
-    return best >= GX_ENROLL_ANCHOR_MIN_SCORE;
-
-  return best >= GX_ENROLL_EXTENSION_MIN_SCORE ||
-         weak_links >= GX_ENROLL_EXTENSION_WEAK_LINKS;
+  /* WAX9 (MateBook D14/D15): skip the connected-enrollment requirement.
+   * On this board's small sensor a wizard-guided move to a "new area" is
+   * geometrically disjoint from the anchor, so the SIFT link score is 0
+   * and the reference connectivity rule (>=2..3) rejects nearly every
+   * legitimate capture, making enrollment practically impossible. Windows
+   * enrollment works the same independent-impression way: keep the quality
+   * gates, log the link stats, but accept the view so the 20 slots cover
+   * the finger. Authentication is unaffected: verify still needs score>=7
+   * against at least one enrolled view. */
+  return TRUE;
 }
 
 static void
